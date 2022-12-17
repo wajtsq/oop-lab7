@@ -4,8 +4,8 @@ oop大作业
 ### 题目
 STL Allocator Interface
 An allocator is used by standard library containers as a template parameter :
-  template < class T, class Alloc = allocator<T> > class vector;
-  template < class T, class Alloc = allocator<T> > class list;
+   template < class T, class Alloc = allocator<T> > class vector;
+   template < class T, class Alloc = allocator<T> > class list;
 
 What does an allocator class have? Typically, it possesses:
   typedef void _Not_user_specialized;
