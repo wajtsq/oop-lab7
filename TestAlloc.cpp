@@ -1,7 +1,6 @@
 #include <ctime>
 #include <iostream>
 #include <random>
-#include <vector>
 #include "STL_Allocator.h"
 
 using Point2D = std::pair<int, int>;
