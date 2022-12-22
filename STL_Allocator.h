@@ -94,7 +94,7 @@ class Allocator{
     static size_type heap_size;
 
     // determine the index of free list
-    static size_type free_list_idx(size_type bytes) {
+    inline static size_type free_list_idx(size_type bytes) {
         return ((bytes) + BOUND - 1) / BOUND - 1;
     }
 //TODO:
