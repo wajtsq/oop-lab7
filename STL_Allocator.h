@@ -17,156 +17,131 @@ class Mallocate{
     }
 };
 
-
 // the max size of small block in memory pool
 enum { MAX_BYTES = 65536 };
-
 // the align size of each block, i.e. the size could be divided by 64
 enum { BOUND = 64 };
-//TODO:
-//这个可以报告的时候具体写怎么算出的这两个数字
-
-
 // the number of free lists
 enum { COUNT_FREE_LISTS = MAX_BYTES / BOUND };
-//TODO:分配空间变小，速度可能变快，但是总容量会变小
-//template <typename D>
+enum { FIRST_LIST_SIZE = 0 };
+
 // the second allocator using memory pool
 class Allocator{
    public:
    typedef std::size_t size_type;
+   // the union object of free list
     union cell{
         union cell *free_list_link;
-        char client_data[1];
     };
+// This function is used to allocate the n spaces memory from our memory pool.
     static void *allocate(size_type n) {
-        cell *volatile *cur_free_list;
-        cell *res;
-        // If the space to be allocated is greater than the 
-        // maximum space set by memorypool, 
-        // the general space allocation method is followed
+        cell *res, *ptr;
+    // If the space to be allocated is greater than the maximum space set by memorypool, 
+    // the general space allocation method is followed:
         if (n > (size_type)MAX_BYTES) 
             return Mallocate::allocate(n);
-        // find the suitable free list
-        cur_free_list = free_list + free_list_idx(n);
-        //TODO:volatile修饰词
-        res = *cur_free_list;
-        // refill the free list if there is no free list available
+    // If the space to be allocated does not exceed the maximum space set by memorypool
+        ptr = res = free_list[FIRST_LIST_SIZE];
         if (res == nullptr) {
-            void *r = refill(ceil_up(n));
+            void *r = re_alloc(ceil_up(n));
+    // refill the free list if there is no free list available
             return r;
         }
-        // adjust the free list
-        *cur_free_list = res->free_list_link;
+   // adjust the free list
+        ptr = res->free_list_link;
         return res;
     }
 
+    // This function is used to free up space in the memorypool for the application.
     static void deallocate(void *p, size_type n) {
         cell *q = (cell *)p;
         cell *ptr;
-        cell *volatile *cur_free_list;
-
         // if n is large enough, call the first deallocator
         if (n > (size_type)MAX_BYTES) {
             Mallocate::deallocate(p, n);
             return;
         }
         if(q != nullptr){
+        // Delete each item in the linked list in turn
             ptr = q->free_list_link;
             delete(q->free_list_link);
             q = ptr;
         }
-        // TODO:上面这种方法比下面这种要慢
-        // find the suitable free list
-        //cur_free_list = free_list + free_list_idx(n);
-         // adjust the free list
-       //q->free_list_link = *cur_free_list;
-        //*cur_free_list = q;
     }
     private:
-   // the union object of free list
     // free_lists
     static cell *volatile free_list[COUNT_FREE_LISTS];
-
     // chunk allocation state
     static char *start_mem_pool;
     static char *end_mem_pool;
     static size_type heap_size;
 
-    // determine the index of free list
-    inline static size_type free_list_idx(size_type bytes) {
-        return ((bytes) + BOUND - 1) / BOUND - 1;
-    }
-//TODO:
-//改变分配方法会导致结果发生较大变化
-
-    // align the block
+    // align the block 对齐块
     inline static size_type ceil_up(size_type bytes) {
         return (((bytes) + BOUND - 1) & ~(BOUND - 1));
     }
 
-    // allocate using the memory pool
-    static char *chunk_alloc(size_type size, int &cnt_cell) {
-        char *res;
+    /* This function is used to request a block space 
+        and calculate the number of blocks that the vector needs to request, 
+        while changing the values of the start position 
+        and end position in the memorypool      */
+    static char *mem_alloc(size_type size, int &cnt_cell) {
+        char *ptr;
+        cell *res;
         size_type total_bytes = size * cnt_cell;
         // the space left in the memory pool
         size_type bytes_left = end_mem_pool - start_mem_pool;
-
+        // the intial value of end_mem_pool and start_mem_pool are nullptr
         if (bytes_left >= total_bytes) {
             // if the space left is enough
-            res = start_mem_pool;
+            ptr = start_mem_pool;
             start_mem_pool += total_bytes;
-            return res;
+            return ptr;
         } else if (bytes_left >= size) {
             // the space is not enough for requirement
             // but enough for at least one block
             cnt_cell = bytes_left / size;
-            total_bytes = size * cnt_cell;
-            res = start_mem_pool;
+            total_bytes = size * cnt_cell;  // change the space
+            ptr = start_mem_pool;
             start_mem_pool += total_bytes;
-            return res;
-        } else {
+            return ptr;
+        } 
+        else {  
             // the space is even not enough for one block
-            size_type bytes_to_get =
-                2 * total_bytes + ceil_up(heap_size >> 4);
-            // try to make use of the scattered space
-            if (bytes_to_get > 0 and start_mem_pool != nullptr) {
+            size_type bytes_to_get = total_bytes + ceil_up(heap_size >> 4);
+            // use the scattered spaces
+            if (bytes_to_get > 0 && start_mem_pool != nullptr) {
                 // if there is still some space
-                cell *volatile *my_free_list =
-                    free_list + free_list_idx(bytes_left);
+                cell *my_free_list = free_list[FIRST_LIST_SIZE];
                 // adjust the free list
-                ((cell *)start_mem_pool)->free_list_link = *my_free_list;
-                *my_free_list = (cell *)start_mem_pool;
+                res->free_list_link = my_free_list;
+                my_free_list = res;
             }
-
             // supply the memory pool
             start_mem_pool = (char *)malloc(bytes_to_get);
             heap_size += bytes_to_get;
             end_mem_pool = start_mem_pool + bytes_to_get;
-
             // adjust the cnt_cell
-            return chunk_alloc(size, cnt_cell);
+            return mem_alloc(size, cnt_cell);
         }
     }
 
-    // return an object consuming the space of n
-    static void *refill(size_type n) {
+
+    // This function is used to request space for n blocks
+    static void *re_alloc(size_type n) {
         int cnt_cell = 20;
-        //TODO:改变大小影响时间
-        // cnt_cell is passed by reference
-        char *chunk = chunk_alloc(n, cnt_cell);
+        // the initial blocks, cnt_cell is passed by reference
+        cell *chunk = (cell*)mem_alloc(n, cnt_cell);
         cell *volatile *my_free_list;
-        cell *res;
+        // the list head
         cell *current_cell, *next_cell;
-
-        // if get only one block, return it
-        if (cnt_cell == 1) return chunk;
+        // if get only one block, then return it
+        if (cnt_cell == 1) 
+            return chunk;
         // prepare to adjust free list
-        my_free_list = free_list + free_list_idx(n);
+        my_free_list = free_list + FIRST_LIST_SIZE;
         // the block to be returned
-        res = (cell *)chunk;
-        *my_free_list = next_cell = (cell *)(chunk + n);
-
+        *my_free_list = next_cell = (cell *)((char*)chunk + n);
         // link the remaining block
         for (int i = 1;; i++) {
             current_cell = next_cell;
@@ -178,20 +153,17 @@ class Allocator{
                 current_cell->free_list_link = next_cell;
             }
         }
-        return res;
+        // use the linked list to build a series blocks
+        return chunk;
     }
-
 };
 
 // initialize the second allocator
 char *Allocator ::start_mem_pool = nullptr;
-
 char *Allocator ::end_mem_pool = nullptr;
-
 std::size_t Allocator::heap_size = 0;
 // 最后一段空间为空
 Allocator::cell *volatile Allocator::free_list[COUNT_FREE_LISTS] = {nullptr};
-// TODO: 越小越慢
 
 // the interface of allocator
 template <class T>
@@ -223,11 +195,9 @@ class Mallocator {
             return p;
         throw std::bad_alloc();
     }
-    
     void deallocate(pointer _Ptr, size_type _Count) {
         Allocator::deallocate(_Ptr, _Count);
     }
-
     template <class _Uty>
     void destroy(_Uty *_Ptr) {
         _Ptr->~_Uty();

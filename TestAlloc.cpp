@@ -7,14 +7,14 @@ using Point2D = std::pair<int, int>;
 
 const int TestSize = 10000;
 // PickSize is increase to 10000 to make the test result more apparent
-const int PickSize = 10000;
+const int PickSize = 1000;
 
 // The tester for different allocator
 template <template <class> class MyAllocator>
 class tester {
    public:
     // the main function is provided by the project requirement
-    void main() {
+    void test() {
         std::random_device rd;
         std::mt19937 gen(rd());
         std::uniform_int_distribution<> dis(1, TestSize);
@@ -27,7 +27,6 @@ class tester {
         using PointVec = std::vector<Point2D, MyAllocator<Point2D>>;
         std::vector<PointVec, MyAllocator<PointVec>> vecpts(TestSize);
         for (int i = 0; i < TestSize; i++) vecpts[i].resize(dis(gen));
-
         // vector resize
         for (int i = 0; i < PickSize; i++) {
             int idx = dis(gen) - 1;
@@ -35,20 +34,7 @@ class tester {
             vecints[idx].resize(size);
             vecpts[idx].resize(size);
         }
-
         // vector element assignment
-        {
-            int val = 10;
-            int idx1 = dis(gen) - 1;
-            int idx2 = vecints[idx1].size() / 2;
-            vecints[idx1][idx2] = val;
-            if (vecints[idx1][idx2] == val)
-                std::cout << "correct assignment in vecints: " << idx1
-                          << std::endl;
-            else
-                std::cout << "incorrect assignment in vecints: " << idx1
-                          << std::endl;
-        }
         {
             Point2D val(11, 15);
             int idx1 = dis(gen) - 1;
@@ -66,11 +52,11 @@ class tester {
 
 int main() {
     clock_t start;
-
     // test our allocator, which uses memory pool
     tester<Mallocator> tester;
+    std::cout << "The test begins:" << std::endl;
     start = clock();
-    tester.main();
+    tester.test();
     std::cout << "Allocator with memory pool cost: "
               << (clock() - start) * 1.0 / CLOCKS_PER_SEC << " seconds"
               << std::endl
