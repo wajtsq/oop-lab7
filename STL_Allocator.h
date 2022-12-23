@@ -129,7 +129,7 @@ class Allocator{
 
     // This function is used to request space for n blocks
     static void *re_alloc(size_type n) {
-        int cnt_cell = 20;
+        int cnt_cell = 20, i = 1;
         // the initial blocks, cnt_cell is passed by reference
         cell *chunk = (cell*)mem_alloc(n, cnt_cell);
         cell *volatile *my_free_list;
@@ -143,15 +143,14 @@ class Allocator{
         // the block to be returned
         *my_free_list = next_cell = (cell *)((char*)chunk + n);
         // link the remaining block
-        for (int i = 1;; i++) {
+        while (cnt_cell - 1 != i) {
             current_cell = next_cell;
             next_cell = (cell *)((char *)next_cell + n);
             if (cnt_cell - 1 == i) {
                 current_cell->free_list_link = nullptr;
-                break;
-            } else {
-                current_cell->free_list_link = next_cell;
-            }
+            } 
+            current_cell->free_list_link = next_cell;
+            i++;
         }
         // use the linked list to build a series blocks
         return chunk;
