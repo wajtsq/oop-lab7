@@ -76,7 +76,7 @@ class Allocator{
     static char *end_mem_pool;
     static size_type heap_size;
 
-    // align the block 对齐块
+    // align the block
     inline static size_type ceil_up(size_type bytes) {
         return (((bytes) + BOUND - 1) & ~(BOUND - 1));
     }
@@ -162,7 +162,7 @@ class Allocator{
 char *Allocator ::start_mem_pool = nullptr;
 char *Allocator ::end_mem_pool = nullptr;
 std::size_t Allocator::heap_size = 0;
-// 最后一段空间为空
+// the last space is empty
 Allocator::cell *volatile Allocator::free_list[COUNT_FREE_LISTS] = {nullptr};
 
 // the interface of allocator
