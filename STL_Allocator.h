@@ -24,7 +24,7 @@ enum { BOUND = 64 };
 // the number of free lists
 enum { COUNT_FREE_LISTS = MAX_BYTES / BOUND };
 enum { FIRST_LIST_SIZE = 0 };
-
+enum { INIT_BLOCK = 10 };
 // the second allocator using memory pool
 class Allocator{
    public:
@@ -129,7 +129,7 @@ class Allocator{
 
     // This function is used to request space for n blocks
     static void *re_alloc(size_type n) {
-        int cnt_cell = 20, i = 1;
+        int cnt_cell = INIT_BLOCK, i = 1;
         // the initial blocks, cnt_cell is passed by reference
         cell *chunk = (cell*)mem_alloc(n, cnt_cell);
         cell *volatile *my_free_list;
